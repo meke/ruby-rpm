@@ -265,12 +265,21 @@ release_entry(rpmTagType type, void* ptr)
 	headerFormat((h), (fmt), (errmsg))
 #define ruby_rpm_headerPutString(h, tag, val) \
 	headerPutString((h), (tag), (val))
+/*
+ * headerPutBin()/headerPutUint32()/headerPutStringArray() gained a `const`
+ * on their value argument at some point between RPM 4.6 and today, and we
+ * need to build against the whole range (RPM 4.8+). Casting through void*
+ * (rather than to a const- or non-const-qualified pointer type) sidesteps
+ * having to know exactly which RPM release made that change, since void*
+ * converts implicitly to either a const or non-const target without a
+ * discarded-qualifiers/incompatible-pointer-types diagnostic either way.
+ */
 #define ruby_rpm_headerPutBin(h, tag, val, size) \
-	headerPutBin((h), (tag), (const uint8_t*)(val), (size))
+	headerPutBin((h), (tag), (void*)(val), (size))
 #define ruby_rpm_headerPutInt32Array(h, tag, val, size) \
-	headerPutUint32((h), (tag), (const uint32_t*)(val), (size))
+	headerPutUint32((h), (tag), (void*)(val), (size))
 #define ruby_rpm_headerPutStringArray(h, tag, val, size) \
-	headerPutStringArray((h), (tag), (const char**)(val), (size))
+	headerPutStringArray((h), (tag), (void*)(val), (size))
 #define ruby_rpm_headerDel(h, tag) headerDel((h), (tag))
 #endif
 
