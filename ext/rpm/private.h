@@ -58,6 +58,68 @@
 
 #include "ruby-rpm.h"
 
+#if RPM_VERSION_CODE > RPM_VERSION(4,9,0) || RPM_VERSION_CODE > RPM_VERSION(5,0,0)
+
+/* compat header */
+
+/* from rpmbuild_internal.h */
+typedef struct Package_s * Package;
+
+/* from rpmbuild_misc.h */
+typedef struct StringBufRec *StringBuf;
+
+/* from rpmbuild_internal.h */
+
+/** \ingroup rpmbuild
+ * The structure used to store values parsed from a spec file.
+ */
+struct rpmSpec_s {
+    char * specFile;    /*!< Name of the spec file. */
+    char * buildRoot;
+    char * buildSubdir;
+    const char * rootDir;
+
+    struct OpenFileInfo * fileStack;
+    char lbuf[10*BUFSIZ];
+    char *lbufPtr;
+    char nextpeekc;
+    char * nextline;
+    char * line;
+    int lineNum;
+
+    struct ReadLevelEntry * readStack;
+
+    Header buildRestrictions;
+    rpmSpec * BASpecs;
+    const char ** BANames;
+    int BACount;
+    int recursing;              /*!< parse is recursive? */
+
+    rpmSpecFlags flags;
+
+    struct Source * sources;
+    int numSources;
+    int noSource;
+
+    char * sourceRpmName;
+    unsigned char * sourcePkgId;
+    Header sourceHeader;
+    rpmfi sourceCpioList;
+
+    rpmMacroContext macros;
+
+    StringBuf prep;             /*!< %prep scriptlet. */
+    StringBuf build;            /*!< %build scriptlet. */
+    StringBuf install;          /*!< %install scriptlet. */
+    StringBuf check;            /*!< %check scriptlet. */
+    StringBuf clean;            /*!< %clean scriptlet. */
+
+    StringBuf parsed;           /*!< parsed spec contents */
+
+    Package packages;           /*!< Package list. */
+};
+#endif
+
 #define RPM_DB(v) (((rpm_db_t*)DATA_PTR((v)))->db)
 #ifdef PKG_CACHE_TEST
 #define RPM_HEADER(v) rpm_package_get_header(v)
