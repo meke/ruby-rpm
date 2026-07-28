@@ -549,6 +549,15 @@ rpm_spec_expand_macros(VALUE spec, VALUE name)
 	return val;
 }
 
+VALUE
+rpm_spec_get_specfile(VALUE spec)
+{
+	if (RPM_SPEC(spec)->specFile) {
+		return rb_str_new2(RPM_SPEC(spec)->specFile);
+	}
+	return Qnil;
+}
+
 void
 Init_rpm_spec(void)
 {
@@ -565,6 +574,7 @@ Init_rpm_spec(void)
 	rb_define_method(rpm_cSpec, "packages", rpm_spec_get_packages, 0);
 	rb_define_method(rpm_cSpec, "build", rpm_spec_build, -1);
 	rb_define_method(rpm_cSpec, "expand_macros", rpm_spec_expand_macros, 1);
+	rb_define_method(rpm_cSpec, "specfile", rpm_spec_get_specfile, 0);
 	rb_undef_method(rpm_cSpec, "dup");
 	rb_undef_method(rpm_cSpec, "clone");
 
