@@ -98,6 +98,7 @@ m_readrc(int argc, VALUE* argv, VALUE m)
 		strcat(buf, ":");
 	}
 	rpmFreeMacros(NULL);
+	rpmFreeRpmrc();
 	if (rpmReadConfigFiles(buf, NULL)) {
 		rb_raise(rb_eRuntimeError, "can not read rc file %s", buf);
 	}
