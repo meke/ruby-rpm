@@ -1127,6 +1127,7 @@ rpm_transaction_commit(int argc, VALUE* argv, VALUE trans)
 		rpmtsSetNotifyCallback(RPM_TRANSACTION(trans),
 							   (rpmCallbackFunction)transaction_callback,(void *)trans);
 	}else{
+#if RPM_VERSION_CODE < RPM_VERSION(4,10,0)
 		VALUE keys;
 
 		/* rpmcli.h:extern int rpmcliPackagesTotal; */
@@ -1136,7 +1137,7 @@ rpm_transaction_commit(int argc, VALUE* argv, VALUE trans)
 
 		if (!NIL_P(keys))
 			rpmcliPackagesTotal = NUM2INT(rb_funcall(keys,rb_intern("length"),0));
-
+#endif
 		rpmtsSetNotifyCallback(RPM_TRANSACTION(trans), rpmShowProgress,
 							   (void*)((long)(INSTALL_HASH|INSTALL_LABEL)));
 	}
