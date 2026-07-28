@@ -80,7 +80,8 @@ package_new_from_header(VALUE klass, Header hdr)
 		free(sigmd5);
 	}
 	if (NIL_P(p)){
-		p = Data_Wrap_Struct(klass, NULL, package_free, headerLink(hdr));
+		p = rb_obj_alloc(klass);
+		DATA_PTR(p) = headerLink(hdr);
 		if(tbl)
 			st_insert(tbl,signature,p);
 	}
@@ -1080,10 +1081,22 @@ rpm_package_inspect(VALUE pkg)
 	return rb_str_new2(buf);
 }
 
+/*
+ * See db_alloc() in db.c: avoids the T_DATA allocator-undefine warning on
+ * first use, since Package objects (and any subclass created via the cache
+ * table) are always wrapped with package_free.
+ */
+static VALUE
+package_alloc(VALUE klass)
+{
+	return Data_Wrap_Struct(klass, 0, package_free, 0);
+}
+
 void
 Init_rpm_package(void)
 {
 	rpm_cPackage = rb_define_class_under(rpm_mRPM, "Package", rb_cObject);
+	rb_define_alloc_func(rpm_cPackage, package_alloc);
 	rb_define_singleton_method(rpm_cPackage, "open", package_s_open, 1);
 	rb_define_singleton_method(rpm_cPackage, "new", package_s_open, 1);
 	rb_define_singleton_method(rpm_cPackage, "create", package_s_create, 2);

@@ -135,7 +135,8 @@ db_s_open(int argc, VALUE* argv, VALUE obj)
 
 	rdb->ref_count = 0;
 	db_ref(rdb);
-	db = Data_Wrap_Struct(rpm_cDB, NULL, db_free, rdb);
+	db = rb_obj_alloc(rpm_cDB);
+	DATA_PTR(db) = rdb;
 	if (!writable) {
 		rb_obj_freeze(db);
 	}
@@ -626,6 +627,7 @@ VALUE
 rpm_transaction_init_iterator(VALUE trans, VALUE key, VALUE val)
 {
 	rpm_mi_t* mi;
+	VALUE miobj;
 
 	if (!NIL_P(val) && TYPE(val) != T_STRING) {
 		rb_raise(rb_eTypeError, "illegal argument type");
@@ -635,7 +637,9 @@ rpm_transaction_init_iterator(VALUE trans, VALUE key, VALUE val)
 	if ((mi->mi = rpmtsInitIterator(RPM_TRANSACTION(trans), NUM2INT(rb_Integer(key)),
 						   NIL_P(val) ? NULL : RSTRING_PTR(val),
                            NIL_P(val) ? 0 : RSTRING_LEN(val)))){
-		return Data_Wrap_Struct(rpm_cMatchIterator, NULL, mi_free, mi);
+		miobj = rb_obj_alloc(rpm_cMatchIterator);
+		DATA_PTR(miobj) = mi;
+		return miobj;
 	}
 	free(mi);
     /* FIXME: returning nil here is a pain; for ruby, it would be nicer
@@ -1257,6 +1261,7 @@ VALUE
 rpm_db_init_iterator(VALUE db, VALUE key, VALUE val)
 {
 	rpm_mi_t* mi;
+	VALUE miobj;
 
 	check_closed(db);
 
@@ -1270,7 +1275,9 @@ rpm_db_init_iterator(VALUE db, VALUE key, VALUE val)
                            NIL_P(val) ? 0 : RSTRING_LEN(val)))){
 		mi->db = (rpm_db_t*)DATA_PTR(db);
 		db_ref(mi->db);
-		return Data_Wrap_Struct(rpm_cMatchIterator, NULL, mi_free, mi);
+		miobj = rb_obj_alloc(rpm_cMatchIterator);
+		DATA_PTR(miobj) = mi;
+		return miobj;
 	}
 	free(mi);
     /* FIXME: returning nil here is a pain; for ruby, it would be nicer
@@ -1282,6 +1289,7 @@ VALUE
 rpm_db_init_iterator(VALUE db, VALUE key, VALUE val)
 {
 	rpm_mi_t* mi;
+	VALUE miobj;
 
 	check_closed(db);
 
@@ -1293,7 +1301,9 @@ rpm_db_init_iterator(VALUE db, VALUE key, VALUE val)
 	if ((mi->mi = rpmtsInitIterator(((rpm_db_t*)DATA_PTR(db))->ts, NUM2INT(rb_Integer(key)),
 						   NIL_P(val) ? NULL : RSTRING_PTR(val),
                            NIL_P(val) ? 0 : RSTRING_LEN(val)))){
-		return Data_Wrap_Struct(rpm_cMatchIterator, NULL, mi_free, mi);
+		miobj = rb_obj_alloc(rpm_cMatchIterator);
+		DATA_PTR(miobj) = mi;
+		return miobj;
 	}
 	free(mi);
     /* FIXME: returning nil here is a pain; for ruby, it would be nicer
@@ -1369,10 +1379,23 @@ rpm_mi_each(VALUE mi)
         return Qnil;
 }
 
+/*
+ * RPM::DB objects are always wrapped with db_free, so registering a real
+ * allocator (rather than relying on Ruby's implicit legacy-Data_Wrap_Struct
+ * compatibility shim) avoids the "undefining the allocator of T_DATA
+ * class RPM::DB" warning on first use.
+ */
+static VALUE
+db_alloc(VALUE klass)
+{
+	return Data_Wrap_Struct(klass, 0, db_free, 0);
+}
+
 void
 Init_rpm_DB(void)
 {
 	rpm_cDB = rb_define_class_under(rpm_mRPM, "DB", rb_cObject);
+	rb_define_alloc_func(rpm_cDB, db_alloc);
 	rb_include_module(rpm_cDB, rb_mEnumerable);
 	rb_define_singleton_method(rpm_cDB, "new", db_s_open, -1);
 	rb_define_singleton_method(rpm_cDB, "open", db_s_open, -1);
@@ -1395,10 +1418,20 @@ Init_rpm_DB(void)
 	rb_undef_method(rpm_cDB, "clone");
 }
 
+/*
+ * See db_alloc(): avoids the T_DATA allocator-undefine warning on first use.
+ */
+static VALUE
+mi_alloc(VALUE klass)
+{
+	return Data_Wrap_Struct(klass, 0, mi_free, 0);
+}
+
 void
 Init_rpm_MatchIterator(void)
 {
 	rpm_cMatchIterator = rb_define_class_under(rpm_mRPM, "MatchIterator", rb_cObject);
+	rb_define_alloc_func(rpm_cMatchIterator, mi_alloc);
 	rb_include_module(rpm_cMatchIterator, rb_mEnumerable);
 	rb_define_method(rpm_cMatchIterator, "each", rpm_mi_each, 0);
 	rb_define_method(rpm_cMatchIterator, "next_iterator", rpm_mi_next_iterator, 0);
