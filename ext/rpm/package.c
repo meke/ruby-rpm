@@ -7,7 +7,7 @@
 /* $Id: package.c 45 2004-06-04 15:11:20Z kazuhiko $ */
 
 #include "private.h"
-#include <st.h>
+#include <ruby/st.h>
 
 #ifndef stpcpy
 char *stpcpy( char *dest, const char *source );
