@@ -50,7 +50,9 @@ def check_rpm
   $libs = append_library($libs, 'rpmbuild') if rpm_version >= rpm_version([4,9,0]) && rpm_version < rpm_version([5,0,0])
   have_library('rpmbuild', 'getBuildTime')
   if rpm_version >= rpm_version([4,6,0])
-    $defs << "-D_RPM_4_4_COMPAT"
+    # RPM >= 4.14 removed the RPM 4.4.x compatibility layer entirely, so
+    # defining _RPM_4_4_COMPAT now triggers a hard #error in rpm/rpmlib.h.
+    $defs << "-D_RPM_4_4_COMPAT" if rpm_version < rpm_version([4,14,0])
     return true
   end
   if have_header('rpm/rpmlib.h') and
@@ -92,10 +94,10 @@ exit unless check_rpm_version
 
 check_debug
 
-HEADERS = [ "rpmlog", "rpmps", "rpmts", "rpmds", "rpmspec" ]
+HEADERS = [ "rpmlib", "rpmlog", "rpmps", "rpmts", "rpmds", "rpmspec" ]
 HEADERS.each { |hdr| have_header("rpm/#{hdr}.h") }
 
-$CFLAGS="#{$CFLAGS} -Werror -Wno-deprecated-declarations -Wno-error=cpp -Wno-error=unused-function -Wno-error=implicit-function-declaration -Wno-error=unused-variable -Wno-error=unused-but-set-variable"
+$CFLAGS="#{$CFLAGS} -Werror -Wno-deprecated-declarations -Wno-error=cpp -Wno-error=unused-function -Wno-error=implicit-function-declaration -Wno-error=unused-variable -Wno-error=unused-but-set-variable -Wno-error=undef -Wno-error=suggest-attribute=noreturn -Wno-error=missing-noreturn"
 
 system 'gcc -MM *.c >depend 2>/dev/null'
 

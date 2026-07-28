@@ -13,6 +13,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +25,6 @@
 #include <unistd.h>
 
 #if RPM_VERSION(5,0,0) <= RPM_VERSION_CODE
-#include <stdint.h>
 #include <rpm4compat.h>
 #endif
 
@@ -228,4 +228,73 @@ inline static void
 release_entry(rpmTagType type, void* ptr)
 {
 	rpmtdFreeData(ptr); //?
+}
+
+/* headerAddEntry(), headerAddOrAppendEntry(), headerRemoveEntry() and
+ * headerSprintf() were part of the RPM 4.4.x compatibility layer, which
+ * only exists for RPM_VERSION_CODE < RPM_VERSION(4,6,0) or the RPM 5.x
+ * compat header (rpm4compat.h). For 4.6.0 <= RPM_VERSION_CODE < 5.0.0
+ * (which includes every RPM >= 4.14 in use today) that layer is gone, so
+ * map onto the modern header{Put,Del,Format}* API instead. */
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#define ruby_rpm_headerFormat(h, fmt, errmsg) \
+	headerSprintf((h), (fmt), rpmTagTable, rpmHeaderFormats, (errmsg))
+#define ruby_rpm_headerPutString(h, tag, val) \
+	headerAddEntry((h), (tag), RPM_STRING_TYPE, (void*)(val), 1)
+#define ruby_rpm_headerPutBin(h, tag, val, size) \
+	headerAddEntry((h), (tag), RPM_BIN_TYPE, (void*)(val), (size))
+#define ruby_rpm_headerPutInt32Array(h, tag, val, size) \
+	headerAddOrAppendEntry((h), (tag), RPM_INT32_TYPE, (void*)(val), (size))
+#define ruby_rpm_headerPutStringArray(h, tag, val, size) \
+	headerAddOrAppendEntry((h), (tag), RPM_STRING_ARRAY_TYPE, (void*)(val), (size))
+#define ruby_rpm_headerDel(h, tag) headerRemoveEntry((h), (tag))
+#else
+#define ruby_rpm_headerFormat(h, fmt, errmsg) \
+	headerFormat((h), (fmt), (errmsg))
+#define ruby_rpm_headerPutString(h, tag, val) \
+	headerPutString((h), (tag), (val))
+#define ruby_rpm_headerPutBin(h, tag, val, size) \
+	headerPutBin((h), (tag), (const uint8_t*)(val), (size))
+#define ruby_rpm_headerPutInt32Array(h, tag, val, size) \
+	headerPutUint32((h), (tag), (const uint32_t*)(val), (size))
+#define ruby_rpm_headerPutStringArray(h, tag, val, size) \
+	headerPutStringArray((h), (tag), (const char**)(val), (size))
+#define ruby_rpm_headerDel(h, tag) headerDel((h), (tag))
+#endif
+
+/* headerNVR() and headerNEVRA() are also gone from the same 4.4.x
+ * compatibility layer; headerGetString() is their modern replacement. */
+inline static const char *
+ruby_rpm_header_get_name(Header h)
+{
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+	const char *n = NULL;
+	headerNVR(h, &n, NULL, NULL);
+	return n;
+#else
+	return headerGetString(h, RPMTAG_NAME);
+#endif
+}
+
+inline static void
+ruby_rpm_header_get_vr(Header h, const char **v, const char **r)
+{
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+	headerNVR(h, NULL, v, r);
+#else
+	*v = headerGetString(h, RPMTAG_VERSION);
+	*r = headerGetString(h, RPMTAG_RELEASE);
+#endif
+}
+
+inline static const char *
+ruby_rpm_header_get_arch(Header h)
+{
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+	const char *a = NULL;
+	headerNEVRA(h, NULL, NULL, NULL, NULL, &a);
+	return a;
+#else
+	return headerGetString(h, RPMTAG_ARCH);
+#endif
 }

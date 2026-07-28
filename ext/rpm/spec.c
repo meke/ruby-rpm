@@ -500,12 +500,21 @@ rpm_spec_build(int argc, VALUE* argv, VALUE spec)
 	ts = rpmtsCreate();
 	rc = buildSpec(ts, RPM_SPEC(spec), flags,test);
 	ts_free(ts);
-#else
+#elif RPM_VERSION_CODE < RPM_VERSION(4,14,0)
 	struct rpmBuildArguments_s buildArgs;
 	buildArgs.buildAmount = flags;
 	if (test)
 	       	buildArgs.buildAmount |= RPMBUILD_NOBUILD;
 	rc = rpmSpecBuild(RPM_SPEC(spec), &buildArgs);
+#else
+	/* rpmSpecBuild() gained an explicit rpmts argument in RPM 4.14. */
+	struct rpmBuildArguments_s buildArgs;
+	rpmts ts = rpmtsCreate();
+	buildArgs.buildAmount = flags;
+	if (test)
+	       	buildArgs.buildAmount |= RPMBUILD_NOBUILD;
+	rc = rpmSpecBuild(ts, RPM_SPEC(spec), &buildArgs);
+	ts = rpmtsFree(ts);
 #endif
 
 	return INT2NUM(rc);

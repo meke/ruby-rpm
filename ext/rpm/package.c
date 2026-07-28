@@ -47,8 +47,7 @@ package_free(Header hdr)
 		char *sigmd5;
 		VALUE signature;
 		VALUE p;
-		sigmd5 = headerSprintf(hdr,"%{sigmd5}",
-				rpmTagTable, rpmHeaderFormats, NULL);
+		sigmd5 = ruby_rpm_headerFormat(hdr,"%{sigmd5}", NULL);
 		if(strcmp(sigmd5,"(none)")!=0){
 			signature = INT2NUM(rb_intern(sigmd5));
 			st_delete(tbl,&signature,&p);
@@ -73,8 +72,7 @@ package_new_from_header(VALUE klass, Header hdr)
 
 	if(tbl){
 		char *sigmd5;
-		sigmd5 = headerSprintf(hdr,"%{sigmd5}",
-				rpmTagTable, rpmHeaderFormats, NULL);
+		sigmd5 = ruby_rpm_headerFormat(hdr,"%{sigmd5}", NULL);
 		if(strcmp(sigmd5,"(none)")!=0){
 			signature = INT2NUM(rb_intern(sigmd5));
 			st_lookup(tbl,signature,&p);
@@ -107,12 +105,12 @@ package_s_create(VALUE klass, VALUE name, VALUE version)
 	}
 
 	hdr = headerNew();
-        headerAddEntry(hdr,RPMTAG_NAME,RPM_STRING_TYPE,RSTRING_PTR(name),1);
-        headerAddEntry(hdr,RPMTAG_VERSION,RPM_STRING_TYPE,RSTRING_PTR(rpm_version_get_v(version)),1);
-        headerAddEntry(hdr,RPMTAG_RELEASE,RPM_STRING_TYPE,RSTRING_PTR(rpm_version_get_r(version)),1);
+        ruby_rpm_headerPutString(hdr,RPMTAG_NAME,RSTRING_PTR(name));
+        ruby_rpm_headerPutString(hdr,RPMTAG_VERSION,RSTRING_PTR(rpm_version_get_v(version)));
+        ruby_rpm_headerPutString(hdr,RPMTAG_RELEASE,RSTRING_PTR(rpm_version_get_r(version)));
         if(!NIL_P(rpm_version_get_e(version))){
-		int e = NUM2INT(rpm_version_get_e(version));
-        	headerAddEntry(hdr,RPMTAG_EPOCH,RPM_INT32_TYPE,&e,1);
+		int32_t e = NUM2INT(rpm_version_get_e(version));
+        	ruby_rpm_headerPutInt32Array(hdr,RPMTAG_EPOCH,&e,1);
 	}
 	pkg = package_new_from_header(klass, hdr);
   return pkg;
@@ -290,9 +288,9 @@ rpm_package_add_dependency(VALUE pkg,VALUE dep)
 	evr = RSTRING_PTR((rpm_version_to_vre(rpm_dependency_get_version(dep))));
 	flag = NUM2INT(rpm_dependency_get_flags(dep));
 
-	headerAddOrAppendEntry(RPM_HEADER(pkg),nametag,RPM_STRING_ARRAY_TYPE,&name,1);
-	headerAddOrAppendEntry(RPM_HEADER(pkg),versiontag,RPM_STRING_ARRAY_TYPE,&evr,1);
-	headerAddOrAppendEntry(RPM_HEADER(pkg),flagstag,RPM_INT32_TYPE,&flag,1);
+	ruby_rpm_headerPutStringArray(RPM_HEADER(pkg),nametag,&name,1);
+	ruby_rpm_headerPutStringArray(RPM_HEADER(pkg),versiontag,&evr,1);
+	ruby_rpm_headerPutInt32Array(RPM_HEADER(pkg),flagstag,&flag,1);
   return Qnil;
 }
 
@@ -304,18 +302,18 @@ rpm_package_add_dependency(VALUE pkg,VALUE dep)
 VALUE
 rpm_package_add_int32(VALUE pkg,VALUE tag,VALUE val)
 {
-	int_32 v;
+	int32_t v;
 	if (TYPE(val) == T_FIXNUM) {
-		v = (int_32) FIX2LONG(val);
+		v = (int32_t) FIX2LONG(val);
 	}
 	else if (TYPE(val) == T_BIGNUM) {
-		v = (int_32) NUM2LONG(val);
+		v = (int32_t) NUM2LONG(val);
 	}
 	else {
 		rb_raise(rb_eTypeError, "illegal argument type");
 	}
 
-	headerAddOrAppendEntry(RPM_HEADER(pkg),NUM2INT(tag),RPM_INT32_TYPE,&v,1);
+	ruby_rpm_headerPutInt32Array(RPM_HEADER(pkg),NUM2INT(tag),&v,1);
   return Qnil;
 }
 
@@ -330,7 +328,7 @@ rpm_package_add_string_array(VALUE pkg,VALUE tag,VALUE val)
 	if ((TYPE(val) != T_STRING))  {
 		rb_raise(rb_eTypeError, "illegal argument type");
 	}
-	headerAddOrAppendEntry(RPM_HEADER(pkg),NUM2INT(tag),RPM_STRING_ARRAY_TYPE,RARRAY_PTR(val),1);
+	ruby_rpm_headerPutStringArray(RPM_HEADER(pkg),NUM2INT(tag),RARRAY_PTR(val),1);
   return Qnil;
 }
 
@@ -345,7 +343,7 @@ rpm_package_add_string(VALUE pkg,VALUE tag,VALUE val)
 	if ((TYPE(val) != T_STRING))  {
 		rb_raise(rb_eTypeError, "illegal argument type");
 	}
-	headerAddEntry(RPM_HEADER(pkg),NUM2INT(tag),RPM_STRING_TYPE,RSTRING_PTR((val)),1);
+	ruby_rpm_headerPutString(RPM_HEADER(pkg),NUM2INT(tag),RSTRING_PTR((val)));
   return Qnil;
 }
 
@@ -360,7 +358,7 @@ rpm_package_add_binary(VALUE pkg,VALUE tag,VALUE val)
 	if ((TYPE(val) != T_STRING))  {
 		rb_raise(rb_eTypeError, "illegal argument type");
 	}
-	headerAddEntry(RPM_HEADER(pkg),NUM2INT(tag),RPM_BIN_TYPE,RSTRING_PTR((val)),RSTRING_LEN(val));
+	ruby_rpm_headerPutBin(RPM_HEADER(pkg),NUM2INT(tag),RSTRING_PTR((val)),RSTRING_LEN(val));
   return Qnil;
 }
 
@@ -375,7 +373,7 @@ rpm_package_delete_tag(VALUE pkg, VALUE tag)
 	VALUE val;
 
 	val = rpm_package_aref(pkg, tag);
-	headerRemoveEntry(RPM_HEADER(pkg), tagval);
+	ruby_rpm_headerDel(RPM_HEADER(pkg), tagval);
 	return val;
 }
 
@@ -571,7 +569,7 @@ rpm_package_aref(VALUE pkg, VALUE tag)
 
 	switch (rpmtdType(tagc)) {
 	case RPM_BIN_TYPE:
-		val = rb_str_new2(rpmtdGetString(tagc));
+		val = rb_str_new((const char*)tagc->data, tagc->count);
 		break;
 
 	case RPM_CHAR_TYPE:
@@ -666,8 +664,7 @@ rpm_package_sprintf(VALUE pkg, VALUE fmt)
 	const char *errstr = "(unknown error)";
 	const char *str;
 
-	str = headerSprintf(RPM_HEADER(pkg), StringValueCStr(fmt),
-			rpmTagTable, rpmHeaderFormats, &errstr);
+	str = ruby_rpm_headerFormat(RPM_HEADER(pkg), StringValueCStr(fmt), &errstr);
 	if (str == NULL) {
 		rb_raise(rb_eRuntimeError, "incorrect format: %s",
 				 errstr);
@@ -682,8 +679,7 @@ VALUE
 rpm_package_get_name(VALUE pkg)
 {
 	VALUE name;
-	const char* n;
-	headerNVR(RPM_HEADER(pkg), &n, NULL, NULL);
+	const char* n = ruby_rpm_header_get_name(RPM_HEADER(pkg));
 	name = n ? rb_str_new2(n) : Qnil;
 
 	return name;
@@ -696,8 +692,7 @@ VALUE
 rpm_package_get_arch(VALUE pkg)
 {
 	VALUE arch;
-	const char* a;
-	headerNEVRA(RPM_HEADER(pkg), NULL, NULL, NULL, NULL, &a);
+	const char* a = ruby_rpm_header_get_arch(RPM_HEADER(pkg));
 	arch = a ? rb_str_new2(a) : Qnil;
 
 	return arch;
@@ -713,8 +708,7 @@ rpm_package_get_signature(VALUE pkg)
 
 	if (NIL_P(signature)) {
         	char *sigmd5;
-		sigmd5 = headerSprintf(RPM_HEADER(pkg),"%{sigmd5}",
-				rpmTagTable, rpmHeaderFormats, NULL);
+		sigmd5 = ruby_rpm_headerFormat(RPM_HEADER(pkg),"%{sigmd5}", NULL);
 		if(sigmd5[0]){
 			signature = INT2NUM(rb_intern(sigmd5));
 			rb_ivar_set(pkg, id_signature, signature);
@@ -735,7 +729,7 @@ rpm_package_get_version(VALUE pkg)
 	const char* r;
 	VALUE e;
 
-	headerNVR(RPM_HEADER(pkg), NULL, &v, &r);
+	ruby_rpm_header_get_vr(RPM_HEADER(pkg), &v, &r);
 	if (!v) {
 		ver = Qnil;
 	} else if (!r) {
