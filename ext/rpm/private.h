@@ -149,10 +149,22 @@ struct rpmSpec_s {
 #define RPMTS_AVAILABLE 1
 #endif
 
+#if RPM_VERSION_CODE >= RPM_VERSION(4,9,0) && RPM_VERSION_CODE < RPM_VERSION(5,0,0)
+/*
+ * RPM 4.9 made rpmdb opaque and dropped rpmdbOpen()/rpmdbClose() from the
+ * public API, so for this range database access goes through an rpmts
+ * that RPM::DB owns for the lifetime of the object.
+ */
+typedef struct {
+	rpmts ts;
+	int ref_count;
+} rpm_db_t;
+#else
 typedef struct {
 	rpmdb db;
 	int ref_count;
 } rpm_db_t;
+#endif
 
 typedef struct {
 #if RPM_VERSION_CODE < RPM_VERSION(4,1,0)

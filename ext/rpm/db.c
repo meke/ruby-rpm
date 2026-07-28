@@ -8,9 +8,7 @@
 
 #include "private.h"
 
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
 VALUE rpm_cDB;
-#endif
 VALUE rpm_cTransaction;
 VALUE rpm_cMatchIterator;
 VALUE rpm_sCallbackData;
@@ -31,12 +29,12 @@ static ID id_total;
 static ID id_file;
 static ID id_fdt;
 
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
 static void
 db_ref(rpm_db_t* db){
 	db->ref_count++;
 }
 
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
 static void
 db_unref(rpm_db_t* db){
 	db->ref_count--;
@@ -45,6 +43,21 @@ db_unref(rpm_db_t* db){
 		free(db);
 	}
 }
+#else
+/*
+ * RPM 4.9 removed rpmdbOpen()/rpmdbClose() from the public API; database
+ * access for this range is done through an owned rpmts instead.
+ */
+static void
+db_unref(rpm_db_t* db){
+	db->ref_count--;
+	if (!db->ref_count){
+		rpmtsCloseDB(db->ts);
+		rpmtsFree(db->ts);
+		free(db);
+	}
+}
+#endif
 
 static void
 db_free(rpm_db_t* db)
@@ -99,12 +112,26 @@ db_s_open(int argc, VALUE* argv, VALUE obj)
 
 
 	rdb = ALLOC_N(rpm_db_t,1);
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
 	if (rpmdbOpen(root, &(rdb->db), writable ? O_RDWR | O_CREAT : O_RDONLY, 0644)) {
 		free(rdb);
 		rb_raise(rb_eRuntimeError, "can not open database in %s",
 				 RSTRING_PTR(rb_str_concat(rb_str_new2(root),
 			         rb_str_new2("/var/lib/rpm"))));
 	}
+#else
+	rdb->ts = rpmtsCreate();
+	if (root && *root) {
+		rpmtsSetRootDir(rdb->ts, root);
+	}
+	if (rpmtsOpenDB(rdb->ts, writable ? O_RDWR | O_CREAT : O_RDONLY)) {
+		rpmtsFree(rdb->ts);
+		free(rdb);
+		rb_raise(rb_eRuntimeError, "can not open database in %s",
+				 RSTRING_PTR(rb_str_concat(rb_str_new2(root),
+			         rb_str_new2("/var/lib/rpm"))));
+	}
+#endif
 
 	rdb->ref_count = 0;
 	db_ref(rdb);
@@ -155,11 +182,28 @@ db_s_init(int argc, VALUE* argv, VALUE obj)
 		rb_raise(rb_eArgError, "too many argument(1..2)");
 	}
 
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
 	if (rpmdbInit(root, writable ? O_RDWR | O_CREAT : O_RDONLY)) {
 		rb_raise(rb_eRuntimeError, "can not initialize database in %s",
 				 RSTRING_PTR(rb_str_concat(rb_str_new2(root),
 									   rb_str_new2("/var/lib/rpm"))));
 	}
+#else
+	{
+		rpmts ts = rpmtsCreate();
+		int ret;
+		if (root && *root) {
+			rpmtsSetRootDir(ts, root);
+		}
+		ret = rpmtsInitDB(ts, writable ? 0644 : 0444);
+		rpmtsFree(ts);
+		if (ret) {
+			rb_raise(rb_eRuntimeError, "can not initialize database in %s",
+					 RSTRING_PTR(rb_str_concat(rb_str_new2(root),
+										   rb_str_new2("/var/lib/rpm"))));
+		}
+	}
+#endif
 
 	return Qnil;
 }
@@ -207,8 +251,17 @@ db_s_rebuild(int argc, VALUE* argv, VALUE obj)
 
 #if RPM_VERSION_CODE < RPM_VERSION(4,1,0)
 	ret = rpmdbRebuild(root);
-#elif RPM_VERSION_CODE < RPM_VERSION(5,0,0)
+#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0)
 	ret = rpmdbRebuild(root, NULL, NULL);
+#elif RPM_VERSION_CODE < RPM_VERSION(5,0,0)
+	{
+		rpmts ts = rpmtsCreate();
+		if (root && *root) {
+			rpmtsSetRootDir(ts, root);
+		}
+		ret = rpmtsRebuildDB(ts);
+		rpmtsFree(ts);
+	}
 #else
 	ret = rpmdbRebuild(root, NULL);
 #endif
@@ -326,7 +379,6 @@ rpm_db_each(VALUE db)
 	check_closed(db);
 	return rpm_db_each_match(db,INT2NUM(RPMDBI_PACKAGES),Qnil);
 }
-#endif
 
 static void
 transaction_free(rpm_trans_t* trans)
@@ -1225,6 +1277,29 @@ rpm_db_init_iterator(VALUE db, VALUE key, VALUE val)
        to return an empty array */
 	return Qnil;
 }
+#else
+VALUE
+rpm_db_init_iterator(VALUE db, VALUE key, VALUE val)
+{
+	rpm_mi_t* mi;
+
+	check_closed(db);
+
+	if (!NIL_P(val) && TYPE(val) != T_STRING) {
+		rb_raise(rb_eTypeError, "illegal argument type");
+	}
+
+	mi = ALLOC_N(rpm_mi_t,1);
+	if ((mi->mi = rpmtsInitIterator(((rpm_db_t*)DATA_PTR(db))->ts, NUM2INT(rb_Integer(key)),
+						   NIL_P(val) ? NULL : RSTRING_PTR(val),
+                           NIL_P(val) ? 0 : RSTRING_LEN(val)))){
+		return Data_Wrap_Struct(rpm_cMatchIterator, NULL, mi_free, mi);
+	}
+	free(mi);
+    /* FIXME: returning nil here is a pain; for ruby, it would be nicer
+       to return an empty array */
+	return Qnil;
+}
 #endif
 
 VALUE
@@ -1294,11 +1369,10 @@ rpm_mi_each(VALUE mi)
         return Qnil;
 }
 
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
 void
 Init_rpm_DB(void)
 {
-	rpm_cDB = rb_define_class_under(rpm_mRPM, "DB", rb_cData);
+	rpm_cDB = rb_define_class_under(rpm_mRPM, "DB", rb_cObject);
 	rb_include_module(rpm_cDB, rb_mEnumerable);
 	rb_define_singleton_method(rpm_cDB, "new", db_s_open, -1);
 	rb_define_singleton_method(rpm_cDB, "open", db_s_open, -1);
@@ -1313,17 +1387,18 @@ Init_rpm_DB(void)
 	rb_define_method(rpm_cDB, "writable?", rpm_db_is_writable, 0);
 	rb_define_method(rpm_cDB, "each_match", rpm_db_each_match, 2);
 	rb_define_method(rpm_cDB, "each", rpm_db_each, 0);
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
 	rb_define_method(rpm_cDB, "transaction", rpm_db_transaction, -1);
+#endif
 	rb_define_method(rpm_cDB, "init_iterator", rpm_db_init_iterator, 2);
 	rb_undef_method(rpm_cDB, "dup");
 	rb_undef_method(rpm_cDB, "clone");
 }
-#endif
 
 void
 Init_rpm_MatchIterator(void)
 {
-	rpm_cMatchIterator = rb_define_class_under(rpm_mRPM, "MatchIterator", rb_cData);
+	rpm_cMatchIterator = rb_define_class_under(rpm_mRPM, "MatchIterator", rb_cObject);
 	rb_include_module(rpm_cMatchIterator, rb_mEnumerable);
 	rb_define_method(rpm_cMatchIterator, "each", rpm_mi_each, 0);
 	rb_define_method(rpm_cMatchIterator, "next_iterator", rpm_mi_next_iterator, 0);
@@ -1340,7 +1415,7 @@ Init_rpm_MatchIterator(void)
 void
 Init_rpm_transaction(void)
 {
-	rpm_cTransaction = rb_define_class_under(rpm_mRPM, "Transaction", rb_cData);
+	rpm_cTransaction = rb_define_class_under(rpm_mRPM, "Transaction", rb_cObject);
 #if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
 	rb_define_method(rpm_cTransaction, "db", rpm_transaction_get_db, 0);
 #else

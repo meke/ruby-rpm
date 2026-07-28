@@ -570,7 +570,7 @@ rpm_spec_get_specfile(VALUE spec)
 void
 Init_rpm_spec(void)
 {
-	rpm_cSpec = rb_define_class_under(rpm_mRPM, "Spec", rb_cData);
+	rpm_cSpec = rb_define_class_under(rpm_mRPM, "Spec", rb_cObject);
 	rb_define_singleton_method(rpm_cSpec, "open", spec_s_open, 1);
 	rb_define_singleton_method(rpm_cSpec, "new", spec_s_open, 1);
 	rb_define_method(rpm_cSpec, "buildroot", rpm_spec_get_buildroot, 0);
