@@ -29,7 +29,7 @@ parseEVR(char* evr, const char** ep, const char** vp, const char** rp)
 	char* se;
 
 	s = evr;
-	while (*s && xisdigit(*s)) s++;	/* s points to epoch terminator */
+	while (*s && isdigit((unsigned char)*s)) s++;	/* s points to epoch terminator */
 	se = strrchr(s, '-');			/* se points to version terminator */
 
 	if (*s == ':') {
