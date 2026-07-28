@@ -346,13 +346,13 @@ transaction_free(rpm_trans_t* trans)
 }
 
 static VALUE
-transaction_yield(VALUE tag, VALUE ts)
+transaction_yield(RB_BLOCK_CALL_FUNC_ARGLIST(tag, ts))
 {
 	return rb_yield(ts);
 }
 
 static VALUE
-transaction_commit(VALUE tag, VALUE ts)
+transaction_commit(RB_BLOCK_CALL_FUNC_ARGLIST(tag, ts))
 {
 	rpm_transaction_commit(0, NULL, ts);
 
