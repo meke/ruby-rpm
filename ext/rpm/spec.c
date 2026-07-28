@@ -33,6 +33,7 @@ spec_free(Spec rspec)
 static void
 ts_free(rpmts ts)
 {
+	freeSpec(rpmtsSpec(ts));
 	ts = rpmtsFree(ts);
 }
 

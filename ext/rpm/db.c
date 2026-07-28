@@ -336,6 +336,7 @@ transaction_free(rpm_trans_t* trans)
 #if RPM_VERSION_CODE < RPM_VERSION(4,1,0)
 	rpmtransFree(trans->ts);
 #else
+	freeSpec(rpmtsSpec(trans->ts));
 	rpmtsFree(trans->ts);
 #endif
 #if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
