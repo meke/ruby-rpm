@@ -71,8 +71,7 @@ rpm_file_new(const char* path, const char* md5sum, const char* link_to,
 	argv[9] = INT2NUM(attr);
 	argv[10] = INT2NUM(state);
 
-	file = rb_newobj();
-	OBJSETUP(file, rpm_cFile, T_OBJECT);
+	file = rb_obj_alloc(rpm_cFile);
 	rb_obj_call_init(file, 11, argv);
 
 	return file;

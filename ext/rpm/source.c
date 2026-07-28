@@ -64,8 +64,7 @@ rpm_source_new(const char* fullname, unsigned int num, int no)
 	argv[1] = UINT2NUM(num);
 	argv[2] = no ? Qtrue : Qfalse;
 
-	src = rb_newobj();
-	OBJSETUP(src, rpm_cSource, T_OBJECT);
+	src = rb_obj_alloc(rpm_cSource);
 	rb_obj_call_init(src, 3, argv);
 
 	return src;
@@ -80,8 +79,7 @@ rpm_patch_new(const char* fullname, unsigned int num, int no)
 	argv[1] = UINT2NUM(num);
 	argv[2] = no ? Qtrue : Qfalse;
 
-	src = rb_newobj();
-	OBJSETUP(src, rpm_cPatch, T_OBJECT);
+	src = rb_obj_alloc(rpm_cPatch);
 	rb_obj_call_init(src, 3, argv);
 
 	return src;
@@ -96,8 +94,7 @@ rpm_icon_new(const char* fullname, unsigned int num, int no)
 	argv[1] = UINT2NUM(num);
 	argv[2] = no ? Qtrue : Qfalse;
 
-	src = rb_newobj();
-	OBJSETUP(src, rpm_cIcon, T_OBJECT);
+	src = rb_obj_alloc(rpm_cIcon);
 	rb_obj_call_init(src, 3, argv);
 
 	return src;

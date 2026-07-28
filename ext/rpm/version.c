@@ -162,8 +162,7 @@ rpm_version_new(const char* vr)
 	VALUE argv[1];
 	argv[0] = rb_str_new2(vr);
 
-	ver = rb_newobj();
-	OBJSETUP(ver, rpm_cVersion, T_OBJECT);
+	ver = rb_obj_alloc(rpm_cVersion);
 	rb_obj_call_init(ver, 1, argv);
 
 	return ver;
@@ -178,8 +177,7 @@ rpm_version_new2(const char* vr, int e)
 	argv[0] = rb_str_new2(vr);
 	argv[1] = INT2NUM(e);
 
-	ver = rb_newobj();
-	OBJSETUP(ver, rpm_cVersion, T_OBJECT);
+	ver = rb_obj_alloc(rpm_cVersion);
 	rb_obj_call_init(ver, 2, argv);
 
 	return ver;
@@ -195,8 +193,7 @@ rpm_version_new3(const char* v, const char* r, int e)
 	argv[1] = rb_str_new2(r);
 	argv[2] = INT2NUM(e);
 
-	ver = rb_newobj();
-	OBJSETUP(ver, rpm_cVersion, T_OBJECT);
+	ver = rb_obj_alloc(rpm_cVersion);
 	rb_obj_call_init(ver, 3, argv);
 
 	return ver;

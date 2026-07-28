@@ -93,8 +93,7 @@ rpm_provide_new(const char* name, VALUE version, int flags, VALUE target)
 	argv[2] = INT2NUM(flags);
 	argv[3] = target;
 
-	prov = rb_newobj();
-	OBJSETUP(prov, rpm_cProvide, T_OBJECT);
+	prov = rb_obj_alloc(rpm_cProvide);
 	rb_obj_call_init(prov, 4, argv);
 	rb_ivar_set(prov, id_nametag, INT2NUM(RPMTAG_PROVIDENAME));
 	rb_ivar_set(prov, id_versiontag, INT2NUM(RPMTAG_PROVIDEVERSION));
@@ -112,8 +111,7 @@ rpm_require_new(const char* name, VALUE version, int flags, VALUE target)
 	argv[2] = INT2NUM(flags);
 	argv[3] = target;
 
-	req = rb_newobj();
-	OBJSETUP(req, rpm_cRequire, T_OBJECT);
+	req = rb_obj_alloc(rpm_cRequire);
 	rb_obj_call_init(req, 4, argv);
 	rb_ivar_set(req, id_nametag, INT2NUM(RPMTAG_REQUIRENAME));
 	rb_ivar_set(req, id_versiontag, INT2NUM(RPMTAG_REQUIREVERSION));
@@ -131,8 +129,7 @@ rpm_conflict_new(const char* name, VALUE version, int flags, VALUE target)
 	argv[2] = INT2NUM(flags);
 	argv[3] = target;
 
-	conf = rb_newobj();
-	OBJSETUP(conf, rpm_cConflict, T_OBJECT);
+	conf = rb_obj_alloc(rpm_cConflict);
 	rb_obj_call_init(conf, 4, argv);
 	rb_ivar_set(conf, id_nametag, INT2NUM(RPMTAG_CONFLICTNAME));
 	rb_ivar_set(conf, id_versiontag, INT2NUM(RPMTAG_CONFLICTVERSION));
@@ -150,8 +147,7 @@ rpm_obsolete_new(const char* name, VALUE version, int flags, VALUE target)
 	argv[2] = INT2NUM(flags);
 	argv[3] = target;
 
-	obso = rb_newobj();
-	OBJSETUP(obso, rpm_cObsolete, T_OBJECT);
+	obso = rb_obj_alloc(rpm_cObsolete);
 	rb_obj_call_init(obso, 4, argv);
 	rb_ivar_set(obso, id_nametag, INT2NUM(RPMTAG_OBSOLETENAME));
 	rb_ivar_set(obso, id_versiontag, INT2NUM(RPMTAG_OBSOLETEVERSION));
