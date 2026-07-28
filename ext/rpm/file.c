@@ -282,6 +282,7 @@ rpm_file_is_readme(VALUE file)
 	return (NUM2INT(rb_ivar_get(file, id_attr)) & RPMFILE_README) ? Qtrue : Qfalse;
 }
 
+#if RPM_VERSION_CODE < RPM_VERSION(4,11,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
 /*
  * @return [Boolean] True if the file is listed in the exlude section
  */
@@ -290,6 +291,7 @@ rpm_file_is_exclude(VALUE file)
 {
 	return (NUM2INT(rb_ivar_get(file, id_attr)) & RPMFILE_EXCLUDE) ? Qtrue : Qfalse;
 }
+#endif
 
 /*
  * @return [Boolean] True if the file is replaced during installation
@@ -348,7 +350,9 @@ Init_rpm_file(void)
 	rb_define_method(rpm_cFile, "ghost?", rpm_file_is_ghost, 0);
 	rb_define_method(rpm_cFile, "license?", rpm_file_is_license, 0);
 	rb_define_method(rpm_cFile, "readme?", rpm_file_is_readme, 0);
+#if RPM_VERSION_CODE < RPM_VERSION(4,11,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
 	rb_define_method(rpm_cFile, "exclude?", rpm_file_is_exclude, 0);
+#endif
 	rb_define_method(rpm_cFile, "replaced?", rpm_file_is_replaced, 0);
 	rb_define_method(rpm_cFile, "notinstalled?", rpm_file_is_notinstalled, 0);
 	rb_define_method(rpm_cFile, "netshared?", rpm_file_is_netshared, 0);
