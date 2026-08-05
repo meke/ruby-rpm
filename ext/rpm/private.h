@@ -57,6 +57,7 @@
 #endif
 
 #include "ruby-rpm.h"
+#include "rpm40_compat.h"
 
 #if RPM_VERSION_CODE > RPM_VERSION(4,9,0) || RPM_VERSION_CODE > RPM_VERSION(5,0,0)
 

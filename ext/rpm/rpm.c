@@ -33,7 +33,7 @@ m_aref(VALUE m, VALUE name)
 
 	sprintf(buf, "%%{%s}", RSTRING_PTR(name));
 	tmp = strdup(buf);
-	expandMacros(NULL, NULL, buf, BUFSIZ);
+	ruby_rpm_expand_macros(NULL, NULL, buf, BUFSIZ);
 	if (strcmp(tmp, buf) == 0) {
 		val = Qnil;
 	} else {

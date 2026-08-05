@@ -26,3 +26,18 @@ rpmReadPackageInfo(FD_t fd, Header * sigp, Header * hdrp)
 }
 
 #endif /* RPM_VERSION(4,2,0) <= RPM_VERSION_CODE */
+
+void
+ruby_rpm_expand_macros(void *spec, void *mc, char *buf, size_t buflen)
+{
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+    expandMacros(spec, mc, buf, buflen);
+#else
+    char *expanded = rpmExpand(buf, NULL);
+    if (expanded) {
+        strncpy(buf, expanded, buflen - 1);
+        buf[buflen - 1] = '\0';
+        free(expanded);
+    }
+#endif
+}

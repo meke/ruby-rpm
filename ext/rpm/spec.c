@@ -541,14 +541,9 @@ rpm_spec_expand_macros(VALUE spec, VALUE name)
 		rb_raise(rb_eTypeError, "illegal argument type");
 	}
 	sprintf(buf, "%%{%s}", RSTRING_PTR(name));
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
 	tmp = strdup(buf);
-	expandMacros(RPM_SPEC(spec), RPM_SPEC(spec)->macros, buf, BUFSIZ);
+	ruby_rpm_expand_macros(RPM_SPEC(spec), RPM_SPEC(spec)->macros, buf, BUFSIZ);
 	res = buf;
-#else
-	tmp = rpmExpand(buf, NULL);
-	res = tmp;
-#endif
 	if (strcmp(tmp, buf) == 0) {
 		val = Qnil;
 	} else {
