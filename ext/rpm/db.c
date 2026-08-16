@@ -34,7 +34,7 @@ db_ref(rpm_db_t* db){
 	db->ref_count++;
 }
 
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 static void
 db_unref(rpm_db_t* db){
 	db->ref_count--;
@@ -112,7 +112,7 @@ db_s_open(int argc, VALUE* argv, VALUE obj)
 
 
 	rdb = ALLOC_N(rpm_db_t,1);
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	if (rpmdbOpen(root, &(rdb->db), writable ? O_RDWR | O_CREAT : O_RDONLY, 0644)) {
 		free(rdb);
 		rb_raise(rb_eRuntimeError, "can not open database in %s",
@@ -183,7 +183,7 @@ db_s_init(int argc, VALUE* argv, VALUE obj)
 		rb_raise(rb_eArgError, "too many argument(1..2)");
 	}
 
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	if (rpmdbInit(root, writable ? O_RDWR | O_CREAT : O_RDONLY)) {
 		rb_raise(rb_eRuntimeError, "can not initialize database in %s",
 				 RSTRING_PTR(rb_str_concat(rb_str_new2(root),
@@ -254,7 +254,7 @@ db_s_rebuild(int argc, VALUE* argv, VALUE obj)
 	ret = rpmdbRebuild(root);
 #elif RPM_VERSION_CODE < RPM_VERSION(4,9,0)
 	ret = rpmdbRebuild(root, NULL, NULL);
-#elif RPM_VERSION_CODE < RPM_VERSION(5,0,0)
+#elif !RPM_IS_LEGACY_RPM5FORK
 	{
 		rpmts ts = rpmtsCreate();
 		if (root && *root) {
@@ -392,7 +392,7 @@ transaction_free(rpm_trans_t* trans)
 	freeSpec(rpmtsSpec(trans->ts));
 	rpmtsFree(trans->ts);
 #endif
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	db_unref(trans->db);
 #endif
 	free(trans);
@@ -413,7 +413,7 @@ transaction_commit(RB_BLOCK_CALL_FUNC_ARGLIST(tag, ts))
 	return Qnil;
 }
 
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 VALUE
 rpm_db_transaction(int argc, VALUE* argv, VALUE db)
 {
@@ -616,13 +616,13 @@ static void
 mi_free(rpm_mi_t* mi)
 {
 	rpmdbFreeIterator(mi->mi);
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	db_unref(mi->db);
 #endif
 	free(mi);
 }
 
-#if RPM_VERSION_CODE >= RPM_VERSION(4,9,0) && RPM_VERSION_CODE < RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE >= RPM_VERSION(4,9,0) && !RPM_IS_LEGACY_RPM5FORK
 VALUE
 rpm_transaction_init_iterator(VALUE trans, VALUE key, VALUE val)
 {
@@ -658,7 +658,7 @@ rpm_transaction_delete(VALUE trans, VALUE pkg)
 	VALUE db;
 	VALUE mi;
 
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	db = rb_ivar_get(trans, id_db);
 
 	if (TYPE(pkg) == T_STRING)
@@ -853,7 +853,7 @@ rpm_transaction_check(VALUE trans)
 
 	rc = rpmtsCheck(RPM_TRANSACTION(trans));
 	ps = rpmtsProblems(RPM_TRANSACTION(trans));
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	/* get rid of duplicate problems */
 	rpmpsTrim(ps, RPMPROB_FILTER_NONE);
 #endif
@@ -1031,7 +1031,7 @@ rpm_transaction_keys(VALUE trans)
 
 #if RPM_VERSION_CODE < RPM_VERSION(4,4,5)
 typedef unsigned long rpmCallbackSize_t;
-#elif RPM_VERSION(5,0,0) <= RPM_VERSION_CODE
+#elif RPM_IS_LEGACY_RPM5FORK
 typedef uint64_t rpmCallbackSize_t;
 #else
 typedef unsigned long long rpmCallbackSize_t;
@@ -1256,7 +1256,7 @@ rpm_transaction_abort(VALUE trans)
 	return Qnil; /* NOT REACHED */
 }
 
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 VALUE
 rpm_db_init_iterator(VALUE db, VALUE key, VALUE val)
 {
@@ -1410,7 +1410,7 @@ Init_rpm_DB(void)
 	rb_define_method(rpm_cDB, "writable?", rpm_db_is_writable, 0);
 	rb_define_method(rpm_cDB, "each_match", rpm_db_each_match, 2);
 	rb_define_method(rpm_cDB, "each", rpm_db_each, 0);
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	rb_define_method(rpm_cDB, "transaction", rpm_db_transaction, -1);
 #endif
 	rb_define_method(rpm_cDB, "init_iterator", rpm_db_init_iterator, 2);
@@ -1449,7 +1449,7 @@ void
 Init_rpm_transaction(void)
 {
 	rpm_cTransaction = rb_define_class_under(rpm_mRPM, "Transaction", rb_cObject);
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	rb_define_method(rpm_cTransaction, "db", rpm_transaction_get_db, 0);
 #else
 	rb_define_method(rpm_cTransaction, "init_iterator", rpm_transaction_init_iterator, 2);

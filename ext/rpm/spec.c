@@ -17,7 +17,7 @@ static ID id_src;
 static ID id_pkg;
 static ID id_rest;
 
-#if RPM_VERSION(5,0,0) <= RPM_VERSION_CODE
+#if RPM_IS_LEGACY_RPM5FORK
 #define headerGetEntryMinMemory(hdr,tag,type,ptr,cnt) \
         headerGetEntry(hdr,tag,type,(void**)ptr,cnt)
 #endif
@@ -49,7 +49,7 @@ spec_s_open(VALUE klass, VALUE filename)
 {
 #if RPM_VERSION_CODE < RPM_VERSION(4,1,0)
 	Spec rspec;
-#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	rpmts ts = NULL;
 #else
 	rpmSpec spec = NULL;
@@ -71,7 +71,7 @@ spec_s_open(VALUE klass, VALUE filename)
 		rb_raise(rb_eRuntimeError, "specfile `%s' parsing failed", RSTRING_PTR(filename));
 	}
 	return Data_Wrap_Struct(klass, NULL, spec_free, rspec);
-#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	ts = rpmtsCreate();
 #if RPM_VERSION_CODE < RPM_VERSION(4,4,8)
 	switch (parseSpec(ts, RSTRING_PTR(filename), "/", NULL, 0, "", NULL, 1, 1)) {
@@ -128,7 +128,7 @@ rpm_spec_get_buildroot(VALUE spec)
 	if (RPM_SPEC(spec)->buildRoot) {
 		return rb_str_new2(RPM_SPEC(spec)->buildRoot);
 	}
-#elif RPM_VERSION_CODE < RPM_VERSION(5,0,0)
+#elif !RPM_IS_LEGACY_RPM5FORK
 	char *buildRootURL = rpmGenPath(NULL, "%{buildroot}", NULL);
 	VALUE result = rb_str_new2(buildRootURL);
 	free(buildRootURL);
@@ -148,7 +148,7 @@ rpm_spec_get_buildroot(VALUE spec)
 VALUE
 rpm_spec_get_buildsubdir(VALUE spec)
 {
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	if (RPM_SPEC(spec)->buildSubdir) {
 		return rb_str_new2(RPM_SPEC(spec)->buildSubdir);
 	}
@@ -171,7 +171,7 @@ rpm_spec_get_buildarchs(VALUE spec)
 
 	if (NIL_P(ba)) {
 		ba = rb_ary_new();
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 		register int i;
 		for (i = 0; i < RPM_SPEC(spec)->BACount; i++) {
 			rb_ary_push(ba, rb_str_new2(RPM_SPEC(spec)->BANames[i]));
@@ -202,7 +202,7 @@ rpm_spec_get_buildrequires(VALUE spec)
 {
 	VALUE br = rb_ivar_get(spec, id_br);
 
-#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_IS_LEGACY_RPM5FORK
 	if (NIL_P(br)) {
 		const char** names;
 		const char** vers;
@@ -281,7 +281,7 @@ VALUE
 rpm_spec_get_buildconflicts(VALUE spec)
 {
 	VALUE bc = rb_ivar_get(spec, id_bc);
-#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_IS_LEGACY_RPM5FORK
 	if (NIL_P(bc)) {
 		const char** names;
 		const char** vers;
@@ -359,7 +359,7 @@ rpm_spec_get_build_restrictions(VALUE spec)
 	VALUE cache = rb_ivar_get(spec, id_rest);
 
 	if (NIL_P(cache)) {
-#if RPM_VERSION_CODE >= RPM_VERSION(4,9,0) && RPM_VERSION_CODE < RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE >= RPM_VERSION(4,9,0) && !RPM_IS_LEGACY_RPM5FORK
 		Header header = rpmSpecSourceHeader(RPM_SPEC(spec));
 #else
 		Header header = RPM_SPEC(spec)->buildRestrictions;
@@ -381,7 +381,7 @@ rpm_spec_get_sources(VALUE spec)
 
 	if (NIL_P(src)) {
 		src = rb_ary_new();
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 		struct Source* s = RPM_SPEC(spec)->sources;
 
 		while (s != NULL) {
@@ -435,7 +435,7 @@ rpm_spec_get_packages(VALUE spec)
 
 	if (NIL_P(pkg)) {
 		pkg = rb_ary_new();
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 		Package p = RPM_SPEC(spec)->packages;
 
 		while (p != NULL) {
@@ -495,7 +495,7 @@ rpm_spec_build(int argc, VALUE* argv, VALUE spec)
 
 #if RPM_VERSION_CODE < RPM_VERSION(4,1,0)
 	rc = buildSpec(RPM_SPEC(spec), flags,test);
-#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	rpmts ts = NULL;
 	ts = rpmtsCreate();
 	rc = buildSpec(ts, RPM_SPEC(spec), flags,test);
