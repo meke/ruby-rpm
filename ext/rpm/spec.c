@@ -16,6 +16,7 @@ static ID id_bc;
 static ID id_src;
 static ID id_pkg;
 static ID id_rest;
+static ID id_specfile;
 
 #if RPM_IS_LEGACY_RPM5FORK
 #define headerGetEntryMinMemory(hdr,tag,type,ptr,cnt) \
@@ -55,6 +56,7 @@ spec_s_open(VALUE klass, VALUE filename)
 	rpmSpec spec = NULL;
 	rpmSpecFlags flags = (RPMSPEC_ANYARCH|RPMSPEC_FORCE);
 #endif
+	VALUE result;
 
 	if (TYPE(filename) != T_STRING) {
 		rb_raise(rb_eTypeError, "illegal argument type");
@@ -70,7 +72,7 @@ spec_s_open(VALUE klass, VALUE filename)
 	default:
 		rb_raise(rb_eRuntimeError, "specfile `%s' parsing failed", RSTRING_PTR(filename));
 	}
-	return Data_Wrap_Struct(klass, NULL, spec_free, rspec);
+	result = Data_Wrap_Struct(klass, NULL, spec_free, rspec);
 #elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	ts = rpmtsCreate();
 #if RPM_VERSION_CODE < RPM_VERSION(4,4,8)
@@ -90,14 +92,24 @@ spec_s_open(VALUE klass, VALUE filename)
 	default:
 		rb_raise(rb_eRuntimeError, "specfile `%s' parsing failed", RSTRING_PTR(filename));
 	}
-	return Data_Wrap_Struct(klass, NULL, ts_free, ts);
+	result = Data_Wrap_Struct(klass, NULL, ts_free, ts);
 #else
 	spec = rpmSpecParse(RSTRING_PTR(filename), flags, NULL);
 	if (spec == NULL) {
 		rb_raise(rb_eRuntimeError, "specfile `%s' parsing failed", RSTRING_PTR(filename));
 	}
-	return Data_Wrap_Struct(klass, NULL, rpmSpecFree, spec);
+	result = Data_Wrap_Struct(klass, NULL, rpmSpecFree, spec);
 #endif
+	/*
+	 * Stash the filename the caller gave us for #specfile instead of
+	 * reading RPM_SPEC(spec)->specFile: that reaches into rpm's private
+	 * (non-ABI) struct rpmSpec_s through the guessed-layout compat struct
+	 * in private.h, and that layout has drifted from rpm's actual one
+	 * (e.g. on RPM 4.19.1.1, specFile sits at the 3rd word, not the
+	 * 1st), silently yielding nil forever instead of failing loudly.
+	 */
+	rb_ivar_set(result, id_specfile, filename);
+	return result;
 }
 
 /*
@@ -556,10 +568,7 @@ rpm_spec_expand_macros(VALUE spec, VALUE name)
 VALUE
 rpm_spec_get_specfile(VALUE spec)
 {
-	if (RPM_SPEC(spec)->specFile) {
-		return rb_str_new2(RPM_SPEC(spec)->specFile);
-	}
-	return Qnil;
+	return rb_ivar_get(spec, id_specfile);
 }
 
 void
@@ -588,4 +597,5 @@ Init_rpm_spec(void)
 	id_src = rb_intern("sources");
 	id_pkg = rb_intern("packages");
 	id_rest = rb_intern("build_restrictions");
+	id_specfile = rb_intern("specfile");
 }
