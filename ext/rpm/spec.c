@@ -575,6 +575,16 @@ void
 Init_rpm_spec(void)
 {
 	rpm_cSpec = rb_define_class_under(rpm_mRPM, "Spec", rb_cObject);
+	/*
+	 * Spec objects can only come into existence through open()/new(), which
+	 * wrap the parsed spec themselves; there is no meaningful empty Spec to
+	 * allocate.  Say so explicitly: otherwise rpm_cSpec (and every Ruby
+	 * subclass of it, e.g. Speclint::Spec) still carries Object's default
+	 * allocator, and the legacy Data_Wrap_Struct() in spec_s_open() strips
+	 * it at run time with an "undefining the allocator of T_DATA class ..."
+	 * warning on first use.
+	 */
+	rb_undef_alloc_func(rpm_cSpec);
 	rb_define_singleton_method(rpm_cSpec, "open", spec_s_open, 1);
 	rb_define_singleton_method(rpm_cSpec, "new", spec_s_open, 1);
 	rb_define_method(rpm_cSpec, "buildroot", rpm_spec_get_buildroot, 0);
