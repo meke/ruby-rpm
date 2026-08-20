@@ -19,7 +19,7 @@ VALUE rpm_sChangeLog;
 static ID id_signature;
 struct st_table *tbl = NULL;
 
-#if RPM_VERSION(5,0,0) <= RPM_VERSION_CODE
+#if RPM_IS_LEGACY_RPM5FORK
 #define headerGetEntryMinMemory(hdr,tag,type,ptr,cnt) \
         headerGetEntry(hdr,tag,type,(void**)ptr,cnt)
 #endif
@@ -389,7 +389,7 @@ rpm_package_delete_tag(VALUE pkg, VALUE tag)
 VALUE
 rpm_package_aref(VALUE pkg, VALUE tag)
 {
-#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_IS_LEGACY_RPM5FORK
 	rpmTag tagval = NUM2INT(tag);
 	VALUE val = Qnil;
 	void* data;
@@ -808,7 +808,7 @@ rpm_package_get_files(VALUE pkg)
 	return files;
 }
 
-#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_IS_LEGACY_RPM5FORK
 VALUE
 rpm_package_get_dependency(VALUE pkg,int nametag,int versiontag,int flagtag,VALUE (*dependency_new)(const char*,VALUE,int,VALUE))
 {
@@ -926,7 +926,7 @@ rpm_package_get_obsoletes(VALUE pkg)
 VALUE
 rpm_package_get_changelog(VALUE pkg)
 {
-#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_IS_LEGACY_RPM5FORK
 	VALUE cl;
 	register int i;
 

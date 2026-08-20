@@ -30,7 +30,7 @@ rpmReadPackageInfo(FD_t fd, Header * sigp, Header * hdrp)
 void
 ruby_rpm_expand_macros(void *spec, void *mc, char *buf, size_t buflen)
 {
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
     expandMacros(spec, mc, buf, buflen);
 #else
     char *expanded = rpmExpand(buf, NULL);

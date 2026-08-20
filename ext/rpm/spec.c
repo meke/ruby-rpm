@@ -16,8 +16,9 @@ static ID id_bc;
 static ID id_src;
 static ID id_pkg;
 static ID id_rest;
+static ID id_specfile;
 
-#if RPM_VERSION(5,0,0) <= RPM_VERSION_CODE
+#if RPM_IS_LEGACY_RPM5FORK
 #define headerGetEntryMinMemory(hdr,tag,type,ptr,cnt) \
         headerGetEntry(hdr,tag,type,(void**)ptr,cnt)
 #endif
@@ -49,12 +50,13 @@ spec_s_open(VALUE klass, VALUE filename)
 {
 #if RPM_VERSION_CODE < RPM_VERSION(4,1,0)
 	Spec rspec;
-#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	rpmts ts = NULL;
 #else
 	rpmSpec spec = NULL;
 	rpmSpecFlags flags = (RPMSPEC_ANYARCH|RPMSPEC_FORCE);
 #endif
+	VALUE result;
 
 	if (TYPE(filename) != T_STRING) {
 		rb_raise(rb_eTypeError, "illegal argument type");
@@ -70,8 +72,8 @@ spec_s_open(VALUE klass, VALUE filename)
 	default:
 		rb_raise(rb_eRuntimeError, "specfile `%s' parsing failed", RSTRING_PTR(filename));
 	}
-	return Data_Wrap_Struct(klass, NULL, spec_free, rspec);
-#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+	result = Data_Wrap_Struct(klass, NULL, spec_free, rspec);
+#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	ts = rpmtsCreate();
 #if RPM_VERSION_CODE < RPM_VERSION(4,4,8)
 	switch (parseSpec(ts, RSTRING_PTR(filename), "/", NULL, 0, "", NULL, 1, 1)) {
@@ -90,14 +92,24 @@ spec_s_open(VALUE klass, VALUE filename)
 	default:
 		rb_raise(rb_eRuntimeError, "specfile `%s' parsing failed", RSTRING_PTR(filename));
 	}
-	return Data_Wrap_Struct(klass, NULL, ts_free, ts);
+	result = Data_Wrap_Struct(klass, NULL, ts_free, ts);
 #else
 	spec = rpmSpecParse(RSTRING_PTR(filename), flags, NULL);
 	if (spec == NULL) {
 		rb_raise(rb_eRuntimeError, "specfile `%s' parsing failed", RSTRING_PTR(filename));
 	}
-	return Data_Wrap_Struct(klass, NULL, rpmSpecFree, spec);
+	result = Data_Wrap_Struct(klass, NULL, rpmSpecFree, spec);
 #endif
+	/*
+	 * Stash the filename the caller gave us for #specfile instead of
+	 * reading RPM_SPEC(spec)->specFile: that reaches into rpm's private
+	 * (non-ABI) struct rpmSpec_s through the guessed-layout compat struct
+	 * in private.h, and that layout has drifted from rpm's actual one
+	 * (e.g. on RPM 4.19.1.1, specFile sits at the 3rd word, not the
+	 * 1st), silently yielding nil forever instead of failing loudly.
+	 */
+	rb_ivar_set(result, id_specfile, filename);
+	return result;
 }
 
 /*
@@ -128,7 +140,7 @@ rpm_spec_get_buildroot(VALUE spec)
 	if (RPM_SPEC(spec)->buildRoot) {
 		return rb_str_new2(RPM_SPEC(spec)->buildRoot);
 	}
-#elif RPM_VERSION_CODE < RPM_VERSION(5,0,0)
+#elif !RPM_IS_LEGACY_RPM5FORK
 	char *buildRootURL = rpmGenPath(NULL, "%{buildroot}", NULL);
 	VALUE result = rb_str_new2(buildRootURL);
 	free(buildRootURL);
@@ -148,7 +160,7 @@ rpm_spec_get_buildroot(VALUE spec)
 VALUE
 rpm_spec_get_buildsubdir(VALUE spec)
 {
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	if (RPM_SPEC(spec)->buildSubdir) {
 		return rb_str_new2(RPM_SPEC(spec)->buildSubdir);
 	}
@@ -171,7 +183,7 @@ rpm_spec_get_buildarchs(VALUE spec)
 
 	if (NIL_P(ba)) {
 		ba = rb_ary_new();
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 		register int i;
 		for (i = 0; i < RPM_SPEC(spec)->BACount; i++) {
 			rb_ary_push(ba, rb_str_new2(RPM_SPEC(spec)->BANames[i]));
@@ -202,7 +214,7 @@ rpm_spec_get_buildrequires(VALUE spec)
 {
 	VALUE br = rb_ivar_get(spec, id_br);
 
-#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_IS_LEGACY_RPM5FORK
 	if (NIL_P(br)) {
 		const char** names;
 		const char** vers;
@@ -281,7 +293,7 @@ VALUE
 rpm_spec_get_buildconflicts(VALUE spec)
 {
 	VALUE bc = rb_ivar_get(spec, id_bc);
-#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_IS_LEGACY_RPM5FORK
 	if (NIL_P(bc)) {
 		const char** names;
 		const char** vers;
@@ -359,7 +371,7 @@ rpm_spec_get_build_restrictions(VALUE spec)
 	VALUE cache = rb_ivar_get(spec, id_rest);
 
 	if (NIL_P(cache)) {
-#if RPM_VERSION_CODE >= RPM_VERSION(4,9,0) && RPM_VERSION_CODE < RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE >= RPM_VERSION(4,9,0) && !RPM_IS_LEGACY_RPM5FORK
 		Header header = rpmSpecSourceHeader(RPM_SPEC(spec));
 #else
 		Header header = RPM_SPEC(spec)->buildRestrictions;
@@ -381,7 +393,7 @@ rpm_spec_get_sources(VALUE spec)
 
 	if (NIL_P(src)) {
 		src = rb_ary_new();
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 		struct Source* s = RPM_SPEC(spec)->sources;
 
 		while (s != NULL) {
@@ -435,7 +447,7 @@ rpm_spec_get_packages(VALUE spec)
 
 	if (NIL_P(pkg)) {
 		pkg = rb_ary_new();
-#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 		Package p = RPM_SPEC(spec)->packages;
 
 		while (p != NULL) {
@@ -495,7 +507,7 @@ rpm_spec_build(int argc, VALUE* argv, VALUE spec)
 
 #if RPM_VERSION_CODE < RPM_VERSION(4,1,0)
 	rc = buildSpec(RPM_SPEC(spec), flags,test);
-#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 	rpmts ts = NULL;
 	ts = rpmtsCreate();
 	rc = buildSpec(ts, RPM_SPEC(spec), flags,test);
@@ -556,16 +568,23 @@ rpm_spec_expand_macros(VALUE spec, VALUE name)
 VALUE
 rpm_spec_get_specfile(VALUE spec)
 {
-	if (RPM_SPEC(spec)->specFile) {
-		return rb_str_new2(RPM_SPEC(spec)->specFile);
-	}
-	return Qnil;
+	return rb_ivar_get(spec, id_specfile);
 }
 
 void
 Init_rpm_spec(void)
 {
 	rpm_cSpec = rb_define_class_under(rpm_mRPM, "Spec", rb_cObject);
+	/*
+	 * Spec objects can only come into existence through open()/new(), which
+	 * wrap the parsed spec themselves; there is no meaningful empty Spec to
+	 * allocate.  Say so explicitly: otherwise rpm_cSpec (and every Ruby
+	 * subclass of it, e.g. Speclint::Spec) still carries Object's default
+	 * allocator, and the legacy Data_Wrap_Struct() in spec_s_open() strips
+	 * it at run time with an "undefining the allocator of T_DATA class ..."
+	 * warning on first use.
+	 */
+	rb_undef_alloc_func(rpm_cSpec);
 	rb_define_singleton_method(rpm_cSpec, "open", spec_s_open, 1);
 	rb_define_singleton_method(rpm_cSpec, "new", spec_s_open, 1);
 	rb_define_method(rpm_cSpec, "buildroot", rpm_spec_get_buildroot, 0);
@@ -588,4 +607,5 @@ Init_rpm_spec(void)
 	id_src = rb_intern("sources");
 	id_pkg = rb_intern("packages");
 	id_rest = rb_intern("build_restrictions");
+	id_specfile = rb_intern("specfile");
 }

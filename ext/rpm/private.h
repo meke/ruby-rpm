@@ -10,6 +10,21 @@
 
 #define RPM_VERSION(maj,min,pl) (((maj) << 16) + ((min) << 8) + (pl))
 
+/*
+ * rpm.org's real releases jump straight from the 4.x series to 6.0,
+ * skipping the 5.x version numbers entirely -- specifically to avoid being
+ * confused with the old, unrelated rpm5.org fork, which used version
+ * numbers 5.0.x-5.4.x and kept its own "4.4.x compatibility" layer
+ * (including an rpm4compat.h header it shipped that we don't have).
+ *
+ * Every "RPM_VERSION_CODE >= RPM_VERSION(5,0,0)" check below was written
+ * against that old fork. Real RPM 6.x carries on from the modern (4.9+)
+ * rpm.org API, not the fork's compat layer, so it must be excluded from
+ * those checks -- hence the upper bound here.
+ */
+#define RPM_IS_LEGACY_RPM5FORK \
+	(RPM_VERSION_CODE >= RPM_VERSION(5,0,0) && RPM_VERSION_CODE < RPM_VERSION(6,0,0))
+
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -24,7 +39,7 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 
-#if RPM_VERSION(5,0,0) <= RPM_VERSION_CODE
+#if RPM_IS_LEGACY_RPM5FORK
 #include <rpm4compat.h>
 #endif
 
@@ -130,7 +145,7 @@ struct rpmSpec_s {
 #define RPM_MI(v) (((rpm_mi_t*)DATA_PTR((v)))->mi)
 #if RPM_VERSION_CODE < RPM_VERSION(4,1,0)
 #define RPM_SPEC(v) ((Spec)DATA_PTR((v)))
-#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE > RPM_VERSION(5,0,0)
+#elif RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_IS_LEGACY_RPM5FORK
 #define RPM_SPEC(v) rpmtsSpec((rpmts)DATA_PTR((v)))
 #else
 #define RPM_SPEC(v) ((rpmSpec)DATA_PTR((v)))
@@ -139,7 +154,7 @@ struct rpmSpec_s {
 #define RPM_SCRIPT_FD(v) (((rpm_trans_t*)DATA_PTR((v)))->script_fd)
 
 #if RPM_VERSION_CODE >= RPM_VERSION(4,5,90)
-#if RPM_VERSION_CODE < RPM_VERSION(5,0,0)
+#if !RPM_IS_LEGACY_RPM5FORK
 #define RPMDB_OPAQUE 1
 #define RPMPS_OPAQUE 1
 #else
@@ -150,7 +165,7 @@ struct rpmSpec_s {
 #define RPMTS_AVAILABLE 1
 #endif
 
-#if RPM_VERSION_CODE >= RPM_VERSION(4,9,0) && RPM_VERSION_CODE < RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE >= RPM_VERSION(4,9,0) && !RPM_IS_LEGACY_RPM5FORK
 /*
  * RPM 4.9 made rpmdb opaque and dropped rpmdbOpen()/rpmdbClose() from the
  * public API, so for this range database access goes through an rpmts
@@ -220,7 +235,7 @@ get_entry(Header hdr, rpmTag tag, rpmTagType* type, void** ptr)
 		*ptr = NULL;
 	}
 }
-#elif RPM_VERSION_CODE < RPM_VERSION(5,0,0)
+#elif !RPM_IS_LEGACY_RPM5FORK
 inline static void
 get_entry(Header hdr, rpmTag tag, rpmtd tc)
 {
@@ -249,7 +264,7 @@ release_entry(rpmTagType type, void* ptr)
  * compat header (rpm4compat.h). For 4.6.0 <= RPM_VERSION_CODE < 5.0.0
  * (which includes every RPM >= 4.14 in use today) that layer is gone, so
  * map onto the modern header{Put,Del,Format}* API instead. */
-#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_IS_LEGACY_RPM5FORK
 #define ruby_rpm_headerFormat(h, fmt, errmsg) \
 	headerSprintf((h), (fmt), rpmTagTable, rpmHeaderFormats, (errmsg))
 #define ruby_rpm_headerPutString(h, tag, val) \
@@ -289,7 +304,7 @@ release_entry(rpmTagType type, void* ptr)
 inline static const char *
 ruby_rpm_header_get_name(Header h)
 {
-#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_IS_LEGACY_RPM5FORK
 	const char *n = NULL;
 	headerNVR(h, &n, NULL, NULL);
 	return n;
@@ -301,7 +316,7 @@ ruby_rpm_header_get_name(Header h)
 inline static void
 ruby_rpm_header_get_vr(Header h, const char **v, const char **r)
 {
-#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_IS_LEGACY_RPM5FORK
 	headerNVR(h, NULL, v, r);
 #else
 	*v = headerGetString(h, RPMTAG_VERSION);
@@ -312,7 +327,7 @@ ruby_rpm_header_get_vr(Header h, const char **v, const char **r)
 inline static const char *
 ruby_rpm_header_get_arch(Header h)
 {
-#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+#if RPM_VERSION_CODE < RPM_VERSION(4,6,0) || RPM_IS_LEGACY_RPM5FORK
 	const char *a = NULL;
 	headerNEVRA(h, NULL, NULL, NULL, NULL, &a);
 	return a;

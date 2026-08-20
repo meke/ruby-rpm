@@ -47,7 +47,18 @@ def check_rpm
   dir_config("rpm")
   $libs = append_library($libs, 'rpmdb') if rpm_version < rpm_version([4,6,0])
   $libs = append_library($libs, 'rpm')
-  $libs = append_library($libs, 'rpmbuild') if rpm_version >= rpm_version([4,9,0]) && rpm_version < rpm_version([5,0,0])
+  # RPM split spec-parsing (rpmSpecFree, parseSpec, ...) out into its own
+  # librpmbuild somewhere around 4.9. rpm.org's real releases then skip the
+  # 5.x version numbers entirely and jump straight from 4.x to 6.0 (to avoid
+  # clashing with the old, unrelated rpm5.org fork, which used 5.0.x-5.4.x
+  # and organized its libraries differently) -- so exclude only that old
+  # fork's range here, not everything from 5.0.0 up, or real RPM 6.x builds
+  # link without librpmbuild and blow up at runtime with "undefined symbol:
+  # rpmSpecFree".
+  $libs = append_library($libs, 'rpmbuild') if rpm_version >= rpm_version([4,9,0]) && (rpm_version < rpm_version([5,0,0]) || rpm_version >= rpm_version([6,0,0]))
+  # NOTE: getBuildTime is a static (non-exported) function in every rpm.org
+  # release we've checked, so this check always fails; it's a no-op probe
+  # that doesn't undo the unconditional append_library() above.
   have_library('rpmbuild', 'getBuildTime')
   if rpm_version >= rpm_version([4,6,0])
     # RPM >= 4.14 removed the RPM 4.4.x compatibility layer entirely, so
