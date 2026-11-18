@@ -1449,6 +1449,10 @@ void
 Init_rpm_transaction(void)
 {
 	rpm_cTransaction = rb_define_class_under(rpm_mRPM, "Transaction", rb_cObject);
+	/* Transactions are only ever handed out by RPM::DB/RPM.transaction, which
+	 * wrap the rpmts themselves -- see the note on rb_undef_alloc_func() in
+	 * Init_rpm_spec(). */
+	rb_undef_alloc_func(rpm_cTransaction);
 #if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
 	rb_define_method(rpm_cTransaction, "db", rpm_transaction_get_db, 0);
 #else
