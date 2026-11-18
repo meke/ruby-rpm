@@ -38,6 +38,21 @@ ts_free(rpmts ts)
 	ts = rpmtsFree(ts);
 }
 
+#if RPM_VERSION_CODE >= RPM_VERSION(4,9,0) && RPM_VERSION_CODE < RPM_VERSION(5,0,0)
+static void
+rpm_spec_dfree(void *ptr)
+{
+	if (ptr)
+		rpmSpecFree((rpmSpec)ptr);
+}
+
+static const rb_data_type_t rpm_spec_type = {
+	"rpm_spec",
+	{ 0, rpm_spec_dfree, 0, },
+	0, 0, RUBY_TYPED_FREE_IMMEDIATELY,
+};
+#endif
+
 #endif
 
 /*
@@ -98,7 +113,7 @@ spec_s_open(VALUE klass, VALUE filename)
 	if (spec == NULL) {
 		rb_raise(rb_eRuntimeError, "specfile `%s' parsing failed", RSTRING_PTR(filename));
 	}
-	result = Data_Wrap_Struct(klass, NULL, rpmSpecFree, spec);
+	result = TypedData_Wrap_Struct(klass, &rpm_spec_type, spec);
 #endif
 	/*
 	 * Stash the filename the caller gave us for #specfile instead of

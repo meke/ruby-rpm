@@ -57,6 +57,19 @@ package_free(Header hdr)
 	headerFree(hdr);
 }
 
+static void
+rpm_package_dfree(void *ptr)
+{
+	if (ptr)
+		package_free((Header)ptr);
+}
+
+static const rb_data_type_t rpm_package_type = {
+	"rpm_package",
+	{ 0, rpm_package_dfree, 0, },
+	0, 0, RUBY_TYPED_FREE_IMMEDIATELY,
+};
+
 inline static VALUE
 package_new_from_header(VALUE klass, Header hdr)
 {
@@ -1089,7 +1102,7 @@ rpm_package_inspect(VALUE pkg)
 static VALUE
 package_alloc(VALUE klass)
 {
-	return Data_Wrap_Struct(klass, 0, package_free, 0);
+	return TypedData_Wrap_Struct(klass, &rpm_package_type, 0);
 }
 
 void

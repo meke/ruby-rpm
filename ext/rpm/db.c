@@ -66,6 +66,19 @@ db_free(rpm_db_t* db)
 		db_unref(db);
 }
 
+static void
+rpm_db_dfree(void *ptr)
+{
+	if (ptr)
+		db_free((rpm_db_t*)ptr);
+}
+
+static const rb_data_type_t rpm_db_type = {
+	"rpm_db",
+	{ 0, rpm_db_dfree, 0, },
+	0, 0, RUBY_TYPED_FREE_IMMEDIATELY,
+};
+
 /*
  * The package database is opened, but transactional processing
  * (@see RPM::DB#transaction) cannot be done for when +writable+ is false.
@@ -398,6 +411,22 @@ transaction_free(rpm_trans_t* trans)
 	free(trans);
 }
 
+/* RPM::DB#transaction is only built for rpm < 4.9 */
+#if RPM_VERSION_CODE < RPM_VERSION(4,9,0) || RPM_VERSION_CODE >= RPM_VERSION(5,0,0)
+static void
+rpm_transaction_dfree(void *ptr)
+{
+	if (ptr)
+		transaction_free((rpm_trans_t*)ptr);
+}
+
+static const rb_data_type_t rpm_transaction_type = {
+	"rpm_transaction",
+	{ 0, rpm_transaction_dfree, 0, },
+	0, 0, RUBY_TYPED_FREE_IMMEDIATELY,
+};
+#endif
+
 static VALUE
 transaction_yield(RB_BLOCK_CALL_FUNC_ARGLIST(tag, ts))
 {
@@ -450,7 +479,7 @@ rpm_db_transaction(int argc, VALUE* argv, VALUE db)
 #endif
 	ts->script_fd = 0;
 	ts->db = DATA_PTR(db);
-	trans = Data_Wrap_Struct(rpm_cTransaction, NULL, transaction_free, ts);
+	trans = TypedData_Wrap_Struct(rpm_cTransaction, &rpm_transaction_type, ts);
 	db_ref(ts->db);
 	rb_ivar_set(trans, id_db, db);
 
@@ -621,6 +650,19 @@ mi_free(rpm_mi_t* mi)
 #endif
 	free(mi);
 }
+
+static void
+rpm_mi_dfree(void *ptr)
+{
+	if (ptr)
+		mi_free((rpm_mi_t*)ptr);
+}
+
+static const rb_data_type_t rpm_mi_type = {
+	"rpm_mi",
+	{ 0, rpm_mi_dfree, 0, },
+	0, 0, RUBY_TYPED_FREE_IMMEDIATELY,
+};
 
 #if RPM_VERSION_CODE >= RPM_VERSION(4,9,0) && RPM_VERSION_CODE < RPM_VERSION(5,0,0)
 VALUE
@@ -1388,7 +1430,7 @@ rpm_mi_each(VALUE mi)
 static VALUE
 db_alloc(VALUE klass)
 {
-	return Data_Wrap_Struct(klass, 0, db_free, 0);
+	return TypedData_Wrap_Struct(klass, &rpm_db_type, 0);
 }
 
 void
@@ -1424,7 +1466,7 @@ Init_rpm_DB(void)
 static VALUE
 mi_alloc(VALUE klass)
 {
-	return Data_Wrap_Struct(klass, 0, mi_free, 0);
+	return TypedData_Wrap_Struct(klass, &rpm_mi_type, 0);
 }
 
 void
